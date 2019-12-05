@@ -1,6 +1,7 @@
 from challenge_functions.src.score_submission import score_subm as ss
 from challenge_functions.src.verify_submission import verify_subm as vs
 from challenge_functions.src.baseline_algorithm import rec_popular as rp
+from challenge_functions.src.new_algorithm import rec_popular as na
 import pandas as pd
 import numpy as np
 
@@ -10,17 +11,20 @@ gt_csv = 'C:/Users/Konrad/PycharmProjects/podzial/dane/test_whole.csv'
 test_csv = 'C:/Users/Konrad/PycharmProjects/podzial/dane/test.csv'
 data_path = '../dane/'
 
+def newalgorithm():
+    na.main()
+
 
 def baseline():
-    rp.main(data_path)
+    rp.main()
 
 
 def verify():
-    vs.main(subm_csv, test_csv)
+    vs.main()
 
 
 def score():
-    ss.main(gt_csv, subm_csv)
+    ss.main()
 
 
 def remove_duplicated_sessions(df):
@@ -32,21 +36,62 @@ def remove_duplicated_sessions(df):
         if df['session_id'].values[j] not in session_list:
             session_list.append(df['session_id'].values[j])
             final_df = final_df.append(df.iloc[[j]])
-            while df['step'].values[j] != 1:
+            while j+1 < d and df['step'].values[j+1] != 1:
                 j = j+1
-                final_df.append(df.iloc[[j]])
+                final_df = final_df.append(df.iloc[[j]])
         else:
-            while df['step'].values[j] != 1:
+            while j+1 < d and df['step'].values[j+1] != 1:
                 j = j+1
-        print(str(j)+",")
+        #print(str(j)+",")
         j = j+1
-    return final_df
+    return final_df.reset_index()
+
+
+def remove_duplicated_sessions2(df):
+    session_list = []
+    idx_step_1 = np.array(df[df.step == 1].index)
+    idx_last_step = [x - 1 for x in idx_step_1[1:]]
+    idx_last_step.append(len(df)-1)
+    d = len(idx_step_1)
+    j = 0
+    while j < d:
+        if df['session_id'].values[idx_step_1[j]] not in session_list:
+            session_list.append(df['session_id'].values[idx_step_1[j]])
+            j = j + 1
+        else:
+            df.drop(df.index[idx_step_1[j]:idx_last_step[j]+1], inplace=True)
+            df.reset_index(drop=True, inplace=True)
+            idx_step_1 = np.array(df[df.step == 1].index)
+            idx_last_step = [x - 1 for x in idx_step_1[1:]]
+            idx_last_step.append(df.index[-1])
+            d = len(idx_step_1)
+    return df
+
+
+def remove_duplicated_sessions3(df):
+    session_list = []
+    indexes_to_remove = []
+    idx_step_1 = np.array(df[df.step == 1].index)
+    idx_last_step = [x - 1 for x in idx_step_1[1:]]
+    idx_last_step.append(len(df)-1)
+    d = len(idx_step_1)
+    print("step1 len: "+str(len(idx_step_1)))
+    j = 0
+    while j < d:
+        if df['session_id'].values[idx_step_1[j]] not in session_list:
+            session_list.append(df['session_id'].values[idx_step_1[j]])
+        else:
+            indexes_to_remove.extend(df.index[idx_step_1[j]:idx_last_step[j]+1])
+        j += 1
+    print("to remove len: "+str(len(indexes_to_remove)))
+    df = df[~df.index.isin(indexes_to_remove)]
+    return df.reset_index(drop=True)
 
 
 def split_data():
     df = pd.read_csv("C:/Users/Konrad/Downloads/trivagoRecSysChallengeData2019_v2/train.csv")
     print(len(df))
-    #df = remove_duplicated_sessions(df)
+    #df = remove_duplicated_sessions3(df)
     print(len(df))
 
     unique_sessions = df['session_id'].unique()
@@ -58,9 +103,9 @@ def split_data():
     while df['step'].values[train_set_len] != 1:
         train_set_len = train_set_len+1
 
-    df_train = df[:train_set_len+1]
+    df_train = df[:train_set_len]
 
-    df_whole_test_set = df[train_set_len+1:]
+    df_whole_test_set = df[train_set_len:]
     df_test = df_whole_test_set.copy()
     df_labels = df_test[['session_id', 'action_type', 'reference']].copy()
 
@@ -81,6 +126,7 @@ def split_data():
 
 if __name__ == '__main__':
     split_data()
+    #newalgorithm()
     #baseline()
     #verify()
     #score()
